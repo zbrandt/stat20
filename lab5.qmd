@@ -1,0 +1,246 @@
+---
+title: "Lab 5: People's Park"
+format: html
+---
+
+```{r}
+library(devtools)
+library(tidyverse)
+library(infer)
+library(patchwork)
+
+install_github("stat20/stat20data")
+library(stat20data)
+```
+
+## Question 1
+
+> Print the first few rows with the columns that correspond to the responses to survey questions 1, 7, and 8. Note: we have changed the data back from all numerical data, as suggested by lab question 8, to a mix of numerical and categorical data. Please comment on whether your encoding of the data from Q7 on the questionnaire matches the encoding in `ppk`.
+
+```{r}
+ppk
+
+ppk %>%
+  select("Q1", "Q7_1", "Q7_2", "Q7_3", "Q7_4", "Q7_5", "Q7_6", "Q7_7", "Q8") %>%
+  head()
+```
+
+## Question 2
+
+> Return to your sketches from question 9 here in the lab. Create those visualizations (or more appropriate analogues) using the questionnaire data. For each, add a title and axis labels to make it clear what they are showing, and describe the distribution in words. If your visualization is of ordinal data, the bars should be ordered accordingly. For part a here, you’re welcome to select just three of the priorities to visualize.  
+> a. Question 9  
+> b. Question 10  
+> c. Question 18 and 21 (showing the change from before an after the information in one plot)
+
+```{r}
+p1 <- ppk %>%
+  drop_na(Q9_1) %>%
+  ggplot(aes(x = factor(Q9_1))) +
+  geom_bar() +
+  labs(x = "Increase student housing")
+
+p2 <- ppk %>%
+  drop_na(Q9_2) %>%
+  ggplot(aes(x = factor(Q9_2))) +
+  geom_bar() +
+  labs(x = "Improve on-campus facilities")
+
+p3 <- ppk %>%
+  drop_na(Q9_3) %>%
+  ggplot(aes(x = factor(Q9_3))) +
+  geom_bar() +
+  labs(x = "Improve university faculty and curriculum")
+
+p4 <- ppk %>%
+  drop_na(Q9_4) %>%
+  ggplot(aes(x = factor(Q9_4))) +
+  geom_bar() +
+  labs(x = "Increase investment in athletics and extra-curriculars")
+
+p5 <- ppk %>%
+  drop_na(Q9_5) %>%
+  ggplot(aes(x = factor(Q9_5))) +
+  geom_bar() +
+  labs(x = "Invest in the community and social causes")
+
+p6 <- ppk %>%
+  drop_na(Q9_6) %>%
+  ggplot(aes(x = factor(Q9_6))) +
+  geom_bar() +
+  labs(x = "Other, please specify")
+
+(p1 + p2 + p3 ) / (p4 + p5 + p6)
+```
+
+Here one can see the relative priority respondents gave to each of the response categories. Many people gave high priorities to selections 1 and 3, middling for selection 2, back half for selection 4, a pretty even distribution for 5, and a bottom-of-the-barrel ranking for 6. 
+
+```{r}
+# Question 10
+ppk %>%
+  drop_na(Q10) %>%
+  ggplot(aes(x = factor(Q10))) +
+  geom_bar() +
+  scale_x_discrete(limits = c("Very unimportant", "Somewhat unimportant", 
+                              "Neither important nor unimportant", 
+                              "Somewhat important", "Very important")) +
+  theme(axis.text.x = element_text(angle = 20, vjust = 1, hjust = 1)) +
+  labs(x = "How important is it for UC Berkeley to provide more student housing?")
+```
+
+The distribution here is particularly right skewed, suggesting housing is particularly important among students.
+
+```{r}
+p1 <- ppk %>%
+  drop_na(Q18) %>%
+  ggplot(aes(x = factor(Q18))) +
+  geom_bar() +
+  labs(x = "Before")
+
+p2 <- ppk %>%
+  drop_na(Q21) %>%
+  ggplot(aes(x = factor(Q21))) +
+  geom_bar() +
+  labs(x = "After")
+
+p1 / p2
+```
+
+Here one can see that sudents become more supportive of the project after being exposed to the information provided on the form.
+
+## Question 3
+
+> Create a new column called `support_before` that takes the response data from question 18 and returns `TRUE` for answers of “Very strongly support”, “Strongly support”, and “Somewhat support” and `FALSE` otherwise. What proportion of the survey participants in each class (freshman, sophomore, etc) supported the People’s Park Project before being presented with the information on the bottom of page 14?
+
+```{r}
+ppk %>%
+  mutate("support_before" = (Q18_words == "Very strongly support" | 
+                             Q18_words == "Strongly support" |
+                             Q18_words == "Somewhat support")) %>%
+  drop_na(support_before) %>%
+  group_by(Q1) %>%
+  summarize(support = mean(support_before))
+```
+
+## Question 4
+
+> What is the mean and median rating of the condition of People’s Park (question 15 on the survey)?
+
+```{r}
+ppk %>%
+  drop_na("Q15_1") %>%
+  summarize(mean = mean(Q15_1), median = median(Q15_1))
+```
+
+## Question 5
+
+> Create a new column called `change_in_support` that measures the change in support from question 18 to 21 of the survey. What is the mean change in support of the survey participants in each class (freshman, sophomore, etc) for the People’s Park Project after reading the information? What assumption must you make about the values of the Likert scale in order for these statistics to be informative?
+
+```{r}
+ppk %>%
+  drop_na(Q18) %>%
+  mutate(change_in_support = Q21 - Q18) %>%
+  group_by(Q1) %>%
+  summarize(support = mean(change_in_support))
+```
+
+You have to assume that lower values of the scale suggest higher support, therefore a decrease in the values suggest that support has increased across the board. 
+
+## Question 6
+
+> Construct one addition visualization that captures a variable or relationship between two variables that you are interested in. Describe the structure that you see in the plot.
+
+```{r}
+m1 <- lm(Q18 ~ Q15_1, ppk)
+
+ppk %>%
+  drop_na(Q15_1, Q18) %>%
+  ggplot(aes(x = factor(Q15_1), y = factor(Q18), color = Q1)) +
+  geom_point() +
+  geom_jitter() +
+  labs(x = "Condition of People's Park (0 = Terrible, 10 = Excellent)",
+       y = "Support of development project (1 = Support, 7 = Oppose)",
+       title = "Medium strength, positive, linear association between rating of People's Park \n and support for development project") +
+  geom_abline(slope = coef(m1)[2],
+              intercept = coef(m1)[1],
+              color = "blue")
+
+ppk %>%
+  drop_na(Q15_1, Q18) %>%
+  summarize(r = cor(Q15_1, Q18))
+```
+Here one can see a positive linear relationship between how students rated the condition of the bark from terrible to excellent with how supportive they are of the project from most supportive to least. Those who tend to think the park is in good condition tend not to support the project as much. There is also not obvious clustering among grade level in terms of ratings. 
+
+## Question 7
+
+> Create two 95% confidence intervals for the mean rating of the condition of People’s Park using both the bootstrap and the normal curve. Interpret the interval in the context of the problem in a clear sentence.
+
+```{r}
+ppk %>%
+  drop_na(Q15_1) %>%
+  specify(response = Q15_1) %>%
+  generate(reps = 500, type = "bootstrap") %>%
+  calculate(stat = "mean") %>%
+  get_ci(level = 0.95)
+```
+
+```{r}
+ppk %>%
+  drop_na(Q15_1) %>%
+  summarize(xbar = mean(Q15_1),
+            sx = sd(Q15_1),
+            n = n(),
+            lower_bound = xbar - 1.96 * sx / sqrt(n),
+            upper_bound = xbar + 1.96 * sx / sqrt(n))
+```
+
+I am 95% confident that the true mean rating of the condition of People's Park by students is between 2.904839 and 3.189699. 
+
+## Question 8
+
+> Create two 95% confidence intervals for the overall proportion of students that support the People’s Park Project without having been exposed to the information on page 14 using both the bootstrap and the normal curve. Interpret the interval in the context of the problem in a clear sentence. Do your point estimates approximately match those reported in the Chancellor’s email?
+
+```{r}
+ppk %>%
+  mutate(support_before = (Q18_words == "Very strongly support" | 
+                           Q18_words == "Strongly support" | 
+                           Q18_words == "Somewhat support")) %>%   
+  drop_na(support_before) %>%
+  specify(response = support_before, success = "TRUE") %>%
+  generate(reps = 500, type = "bootstrap") %>%
+  calculate(stat = "prop") %>%
+  get_ci(level = 0.95)
+```
+
+```{r}
+ppk %>%
+  mutate(support_before = (Q18_words == "Very strongly support" | 
+                           Q18_words == "Strongly support" | 
+                           Q18_words == "Somewhat support")) %>%
+  drop_na(support_before) %>%
+  summarize(phat = mean(support_before), 
+            n = n(), 
+            low = phat - 1.96 * sqrt(phat * (1 - phat) / n), 
+            high = phat + 1.96 * sqrt(phat * (1 - phat) / n))
+  
+```
+
+95% of similarly constructed confidence intervals will contain the true proportion of students that support the People’s Park Project without having been exposed to the information on page 14. I am 95% confident that the true proportion is between 0.5257962 and 0.5870751. These values are relatively similar to those in the email.
+
+## Question 9
+
+> Using just the bootstrap, create a 95% confidence interval for the mean change in support for the Project across the entire population after being exposed to the information on page 14.
+
+```{r}
+ppk %>%
+  drop_na(Q18, Q21) %>%
+  mutate(change_in_support = Q21 - Q18) %>%
+  specify(response = change_in_support) %>%
+  generate(reps = 500, type = "bootstrap") %>%
+  calculate(stat = "mean") %>%
+  get_ci(level = 0.95)
+```
+
+## Question 10
+> Does your interval from the previous question contain 0? What are the implications of that for those working in the Chancellor’s Office on the People’s Park Project?
+
+The interval does not contain zero which, if it did contain zero, would make it hard for us to conclude that there is a feasible difference before and after being exposed to the information. In this case, we can conclude as such. 

@@ -1,0 +1,190 @@
+---
+title: "Lab 7: Baseball"
+format: html
+---
+
+```{r}
+library(Lahman)
+library(tidyverse)
+library(broom)
+data(Teams)
+```
+
+## Question 1
+> Subset the Teams data set to only include years from 2000 to present day (this is the data set that you’ll use for the remainder of this lab). What are the dimensions of this filtered data set?
+
+```{r}
+teams <- Teams %>%
+  filter(yearID >= 2000)
+
+```
+
+The dimensions of this new data frame are 690 rows by 48 columns. 
+
+## Question 2
+> Plot the distribution of wins. Describe the shape of the distribution and compare it to your speculations from part 1 of the lab.
+
+```{r}
+teams %>% 
+  ggplot(aes(x = W)) +
+  geom_density()
+```
+
+There is a slight left-sided skew to the distribution of wins. 
+
+## Question 3
+> Plot the relationship between runs and wins. Describe the relationship (form, direction, strength of association, presence of outliers) and compare it to your speculations from part 1 of the lab.
+
+```{r}
+teams %>%
+  ggplot(aes(x = R, y = W)) +
+  geom_point()
+
+```
+
+There is a strong, positive, linear relationship between runs and wins that is demonstrated by the graph. There are two 'clusters' of data points, with one cluster with far fewer points at values of lower wins and runs and another cluster with far more points at higher run and win values. The reason for this smaller cluster is because of the nature of the game during Covid as the season was prematurely ended and so fewer games could be played. Besides this, there do not appear to be any obvious outliers to this relationship. 
+
+## Question 4
+> Plot the relationship between runs allowed and wins. Describe the relationship. How does it compare to the relationship between runs and wins?
+
+```{r}
+teams %>%
+  ggplot(aes(x = RA, y = W)) +
+  geom_point()
+
+```
+
+There is a strong, linear, negative relationship between runs allowed and wins that is demonstrated by two clusters in the above graph. The existence of a smaller cluster of data points near smaller runs allowed and win values is again a product of Covid and a curtailed season. Compared to runs and wins, this relationship is negative, with larger values of runs allowed corresponding to reduced wins.  
+
+## Question 5
+> Split your filtered version of the `Teams` data set into training and testing sets using the guidance provided in the notes (reserve at least 20% for the test set). Save them as `teams_train` and `teams_test`.
+
+```{r}
+set.seed(1)
+
+set_type <- sample(x = c('train', 'test'),
+                   size = 690,
+                   replace = TRUE,
+                   prob = c(0.8, 0.2))
+
+teams <- teams %>%
+  mutate(set_type = set_type)
+
+teams_train <- teams %>%
+  filter(set_type == "train")
+
+teams_test <- teams %>%
+  filter(set_type == "test")
+
+```
+
+## Question 6
+> Using the training data, fit a simple linear model to predict wins by runs and call it `model_1`. Write out the equation for the linear model (using the estimated coefficients) and report the training *R^2^* as well as the testing *R^2^*.
+
+```{r}
+model_1 <- lm(W ~ R, data = teams_train)
+model_1
+
+```
+
+The equation written out: y = 0.09788x + 8.41860, where y is wins and x is runs. 
+
+```{r}
+glance(model_1) %>%
+  select(r.squared)
+
+pred <- predict(model_1, newdata = teams_test)
+
+teams_test %>%
+  mutate(pred = pred,
+         resid_sq = (W - pred)^2) %>%
+  summarize(TSS = sum((W - mean(W))^2),
+            RSS = sum(resid_sq)) %>%
+  mutate(Rsq = 1 - RSS/TSS) %>%
+  select(Rsq)
+
+```
+
+## Question 7
+> What is the average number of season runs and wins? Based on the previous model, how many games would you predict a team that scored the average number of runs would win? What about a team that scored 600 runs? What about 850 runs?
+
+```{r}
+teams %>%
+  summarize(avg_runs = mean(R), avg_wins = mean(W))
+
+avg_runs <- summarize(teams, avg_runs = mean(R), avg_wins = mean(W))$avg_runs
+```
+
+```{r}
+dat <- data.frame(R=c(avg_runs, 600, 850))
+mutate(dat, pred_W = 8.41860 + 0.09788 * R)
+predict(model_1, newdata = dat)
+```
+
+## Question 8
+> Using the training data again, fit a multiple linear regression model to predict wins by runs and runs allowed and save it as `model_2`. Write out the equation for the linear model and report the training and testing *R^2^*. How does this model compare to the simple linear regression from the previous question?
+
+```{r}
+model_2 <- lm(W ~ R + RA, teams_train)
+model_2
+
+```
+
+The equation written out: y = 0.13869x -0.06697z + 27.23817, where y is wins, x is runs, and z is runs allowed. 
+
+```{r}
+glance(model_2) %>%
+  select(r.squared)
+
+pred <- predict(model_2, newdata = teams_test)
+
+teams_test %>%
+  mutate(pred = pred,
+         resid_sq = (W - pred)^2) %>%
+  summarize(TSS = sum((W - mean(W))^2),
+            RSS = sum(resid_sq)) %>%
+  mutate(Rsq = 1 - RSS/TSS) %>%
+  select(Rsq)
+
+```
+
+## Question 9
+> Fit a third, more complex model to predict wins and call it `model_3`. This model should use  
+> a. at least three variables from this data set,  
+> b. at least one non-linear transformation or polynomial term.  
+> Write out the equation for the resulting linear model and report the training and testing *R^2^*.
+
+```{r}
+model_3 <- lm(W ~ E + RA + poly(x = R, degree = 3, raw = TRUE), data = teams_train)
+model_3
+
+```
+
+The equation written out: y = 2.232e-03x - 9.793e-02z + 6.580e-01t - 6.405e-04t^2 + 2.350e-07t^3- 7.761e+01, where y is wins, x is errors, z is runs allowed, and t is runs. 
+
+```{r}
+glance(model_3) %>%
+  select(r.squared)
+
+pred <- predict(model_3, newdata = teams_test)
+
+teams_test %>%
+  mutate(pred = pred,
+         resid_sq = (W - pred)^2) %>%
+  summarize(TSS = sum((W - mean(W))^2),
+            RSS = sum(resid_sq)) %>%
+  mutate(Rsq = 1 - RSS/TSS) %>%
+  select(Rsq)
+
+```
+
+## Question 10
+> Looking across all three models, in general how did the values training *R^2^* compare to the values of testing *R^2^*? Which is the better metric when deciding how well a model will perform on new data? By that metric, which of your three models is best?
+
+For models 2 and 3, the model performed slightly worse on the testing data than on the training data (i.e. it reported a lower R squared coefficient the second tie around). For model 1, the R squared coefficient on the testing data was higher than for the training data. The better metric for deciding how well a model will perform on new data is the second coefficient, because if the models show strongly for the testing data but relatively worse for the new data they are overfitted to the training data. In this regard, the first model performs strongest.  
+
+## Question 11
+> Revisit the definition of causation. If your predictive model has a positive coefficient between one of the predictors and the response, is that evidence that if you increase that predictor variable for a given observation, the response variable will increase? That is, can you (or a sports management team) use this model to draw causal conclusions? Why or why not?
+
+You cannot draw conclusion from a positive linear association because to demonstrate causality one needs to conduct a randomized control trial to evaluate the counter factual. 
+

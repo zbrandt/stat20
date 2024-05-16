@@ -1,0 +1,82 @@
+---
+title: "Case Study: Home Prices"
+format: html
+---
+
+```{r}
+library(tidyverse)
+library(broom)
+LA <- read_csv("https://www.dropbox.com/s/nzhmtmmnz4ix4rd/LA.csv?dl=1") %>%
+    mutate(log_price = log(price),
+           log_sqft = log(sqft),
+           garage_num = na_if(garage, "4+"),
+           garage_num = as.numeric(garage_num),
+           garage_cat = fct_collapse(garage,
+                                     "none" = "0",
+                                     "small" = "1",
+                                     "large" = c("2", "3", "4+")))
+
+```
+
+## Question 1
+> Which cities contain the three outlier mega-mansions discovered in the notes?
+
+```{r}
+LA %>%
+  ggplot(aes(x = sqft, y = price, color = city)) +
+  geom_point()
+```
+
+The three mega-mansions appear to be in Beverly Hills. 
+
+## Question 2
+> Fit two linear models: one that predicts price with sqft and another that predicts log price with log sqft. Which one explains the variance in price better, as measured by training *R^2^*?
+
+```{r}
+m1 <- lm(price ~ sqft, data = LA)
+m2 <- lm(log_price ~ log_sqft, data = LA)
+```
+
+```{r}
+glance(m1) %>%
+  select(r.squared)
+
+glance(m2) %>%
+  select(r.squared)
+```
+
+## Question 3
+> Fit a linear model that predicts `log_price` using `log_sqft`, `bed`, and `bath`.  
+> Last year the University of California purchased a new house to serve as the residence of the university President and to host university functions. The address of the house is 2821 Claremont Blvd in Berkeley. Use your linear model to predict the sale price of this house. (hint: the internet is helpful!)  
+> Was your model an under- or over-estimate? Why do you think this is?
+
+```{r}
+m3 <- lm(log(price) ~ log(sqft) + bed + bath, data = LA)
+m3
+```
+
+```{r}
+uc_log_price <- log(5176829)
+uc_house <- data.frame(sqft = 6640, bed = 6, bath = 6)
+predict(object = m3, newdata = uc_house)
+uc_log_price
+```
+
+The model predicted a value slightly lower than the actual, therefore it was an underestimate. I believe this is because housing is dearer in Berkeley relative to LA and a home with these specifications tends to have a higher price in the Bay Area. 
+
+## Question 4
+> Using the model from the previous question, predict the sale price of a house that is 1000 sqft and has 100 bedrooms and 2 bathrooms. Do you expect your prediction to be an over- or under estimate? Why?
+
+```{r}
+house <- data.frame(sqft = 1000, bed = 100, bath = 2)
+predict(object = m3, newdata = house)
+```
+
+This will definitely be an underestimate because the model was not fit to data where homes had anywhere near 100 bedrooms. The coefficient for beds is negative so this will predict a nonsense price. 
+
+## Question 5
+> Who might find useful a model like this that predicts the dollar value of a house? Try to brainstorm at least three different uses.
+
+1. People who are looking to put a house on the market and wondering what price to expect
+2. People who believe that a house is over or under priced in the market
+3. People who are interested in seeing the differences between regional housing markets and how well or poorly models compare

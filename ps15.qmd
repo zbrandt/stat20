@@ -1,0 +1,63 @@
+---
+title: "Problem Set 15"
+format: html
+---
+
+```{r}
+library(tidyverse)
+library(broom)
+train <- read_csv('https://raw.githubusercontent.com/idc9/course-materials/main/3-prediction/14-overfitting/train.csv')
+
+test <- read_csv('https://raw.githubusercontent.com/idc9/course-materials/main/3-prediction/14-overfitting/test.csv')
+```
+
+## Question 1
+
+> Fit a simple linear model to the training data that that predicts y as a function of x. Use this model to calculate a training and testing *R^2^*.
+
+```{r}
+slr <- lm(formula = y ~ x, data = train)
+
+glance(slr) %>%
+  select(r.squared)
+```
+
+```{r}
+pred_slr <- predict(slr, newdata = test)
+
+test %>%
+  mutate(score_pred_linear = pred_slr,
+         resid_sq_linear = (y - score_pred_linear)^2) %>%
+  summarize(TSS = sum((y - mean(y))^2),
+            RSS_linear = sum(resid_sq_linear)) %>%
+  mutate(Rsq_linear = 1 - RSS_linear/TSS) %>%
+  select(Rsq_linear)
+```
+
+## Question 2
+> Fit a polynomial model to the training data that that predicts y as a function of x. Use this model to calculate a training and testing *R^2^*. The choice of the degree of the polynomial is up to you.
+
+```{r}
+lm_poly <- lm(y ~ poly(x, degree = 20, raw = T), data = train)
+
+glance(lm_poly) %>%
+  select(r.squared)
+```
+
+```{r}
+score_pred_poly <- predict(lm_poly, newdata = test)
+
+test %>%
+  mutate(score_pred_poly = score_pred_poly,
+         resid_sq_poly = (y - score_pred_poly)^2) %>%
+  summarize(TSS = sum((y - mean(y))^2),
+            RSS_poly = sum(resid_sq_poly)) %>%
+  mutate(Rsq_poly = 1 - RSS_poly/TSS) %>%
+  select(Rsq_poly)
+```
+
+## Question 3
+
+> How did the testing and training *R^2^*s compare between the linear and the polynomial models? What is driving the difference in these statistics between these two models?
+
+For both the linear and the polynomial models the training coefficients were higher than the testing coefficients. However, the polynomial models were fit better than the linear models in both cases. The difference is a result of over fitting. 

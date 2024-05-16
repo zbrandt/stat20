@@ -1,0 +1,187 @@
+---
+title: "Lab 4: Elections"
+format: html
+---
+
+```{r}
+library(devtools)
+install_github("stat20/stat20data")
+library(stat20data)
+library(tidyverse)
+library(ggplot2)
+library(patchwork)
+california <- read_csv("https://raw.githubusercontent.com/openelections/openelections-data-ca/master/2020/20201103__ca__general__precinct.csv")
+```
+## Question 1
+> What is the unit of observation in the iran data frame?
+
+```{r}
+iran
+```
+
+The unit of observation is each city in Iran where votes were recorded.
+
+## Question 2
+> What is the empirical distribution of the vote counts for Ahmadinejad? Answer with a plot, numerical summaries of center and spread, and a written interpretation.
+
+```{r}
+iran %>%
+  ggplot(aes(x = ahmadinejad)) + 
+  geom_histogram() +
+  xlim(0, 250000)
+```
+```{r}
+iran %>%
+  summarize(mean = mean(ahmadinejad), 
+            median = median(ahmadinejad), 
+            sd = sd(ahmadinejad))
+```
+The empirical distribution of the votes for Ahmadinejad shows that there are many provinces with votes under the 25000 mark with many much larger outliers in, I assume, cities with far larger populations. As such, the distribution is heavily right skewed. 
+
+## Question 3
+>Complete the uniform distribution table by mutating and saving a column called prob with the corresponding probabilities. Use that table to visualize the distribution and color the bars with gold to make clear this is a probability distribution, not an empirical distribution.
+
+```{r}
+fd_unif <- data.frame(first_digit = seq(1, 9))
+fd_unif <- mutate(fd_unif, prob = 1 / 9)
+fd_unif %>%
+  ggplot(aes(x = factor(first_digit), y = prob)) +
+  geom_col(fill = "gold")
+```
+## Question 4
+What is the expected value of the uniform distribution? Answer this question by mutating a new column in fd_unif and taking its sum, as in the notes.
+
+```{r}
+fd_unif %>%
+  mutate(product = first_digit * prob) %>%
+  summarize(sum = sum(product)) %>%
+  pull()
+```
+
+## Question 5
+> What is the variance? Answer this question by again mutating a new column in fd_unif and taking its sum, as in the notes.
+
+```{r}
+mean <- fd_unif %>%
+  mutate(product = first_digit * prob) %>%
+  summarize(sum = sum(product)) %>%
+  pull()
+
+mean_squared <- fd_unif %>%
+  mutate(product = first_digit * first_digit * prob) %>%
+  summarize(sum = sum(product)) %>%
+  pull()
+
+var <- mean_squared - mean * mean
+var
+```
+
+## Question 6
+> Repeat question 3 but using Benford’s Law and the dataframe fd_benford. As a check that your table represents a valid probability distribution, verify that the sum of prob is 1. (Hint: read the documentation to log() carefully.)
+> Will this distribution have a expected value that is higher, lower, or the same as the Uniform distribution?
+
+```{r}
+fd_benford <- data.frame(first_digit = seq(1, 9))
+fd_benford <- mutate(fd_benford, prob = log10(1 + 1 / first_digit))
+sum(fd_benford$prob)
+```
+
+It will have an expected value that is lower than the uniform distribution because the probability of obtaining larger digits will be lower compared to the uniform distribution. 
+
+## Question 7
+> Using the methods from Questions 4 and 5, calculate the expected value and the variance of Benford’s Law.
+
+```{r}
+mean <- fd_benford %>%
+  mutate(product = first_digit * prob) %>%
+  summarize(sum = sum(product)) %>%
+  pull()
+
+mean_squared <- fd_benford %>%
+  mutate(product = first_digit * first_digit * prob) %>%
+  summarize(sum = sum(product)) %>%
+  pull()
+
+var <- mean_squared - mean * mean
+
+mean
+var
+```
+
+## Question 8
+> What might a sample of 366 draws from benford look like?
+> Use fd_benford as your box with every row a ticket. You can simulate the process of drawing a ticket out of a box by sampling rows from the data frame with slice_sample(). To use this function you must specify the number of rows (n), whether or not to sample with replacement (replace), and which column contains the probability of each ticket (weight_by).
+> Create a plot of the resulting empirical distribution of first digits.
+
+```{r}
+fd_benford %>%
+  select(first_digit, prob) %>%
+  slice_sample(n = 366, replace = TRUE, weight_by = prob) %>%
+  group_by(first_digit) %>%
+  summarize(n = n()) %>%
+  ggplot(aes(x = factor(first_digit), y = n)) + geom_col()
+```
+## Question 9
+> What do the first digit empirical distributions look like for the four candidates in the Iranian presidential election?
+
+```{r}
+p1 <- iran %>%
+  mutate(first_digit = get_first(ahmadinejad)) %>%
+  group_by(first_digit) %>%
+  summarize(n = n()) %>%
+  ggplot(aes(x = factor(first_digit), y = n)) +
+  geom_col()
+p2 <- iran %>%
+  mutate(first_digit = get_first(rezai)) %>%
+  group_by(first_digit) %>%
+  summarize(n = n()) %>%
+  ggplot(aes(x = factor(first_digit), y = n)) +
+  geom_col()
+p3 <- iran %>%
+  mutate(first_digit = get_first(karrubi)) %>%
+  group_by(first_digit) %>%
+  summarize(n = n()) %>%
+  ggplot(aes(x = factor(first_digit), y = n)) +
+  geom_col()
+p4 <- iran %>%
+  mutate(first_digit = get_first(mousavi)) %>%
+  group_by(first_digit) %>%
+  summarize(n = n()) %>%
+  ggplot(aes(x = factor(first_digit), y = n)) +
+  geom_col()
+p1 / p2 / p3 / p4
+```
+
+## Question 10
+> How do the observed first digit distributions compare to those simulated from Benford’s Law? Which candidate has a first-digit distribution most similar to and most different from the simulated ones?
+
+The candidate with the first-digit distribution that is most different from the simulated ones is Ahmadinejad considering the large amount of cities recording vote totals with 2 and 3 first digits. The one that looks most similar to Benford's distribution is Rezai's first-digit distribution with each subsequent digit having fewer votes recorded than the previous one. 
+
+## Question 11
+> What state did you choose to study? What is the unit of observation in your state’s data frame? What are the dimensions?
+
+```{r}
+california
+```
+
+I chose the state of California and each unit of observation is each voting precinct recorded in the data frame. The dimensions are 360,892 by 10.
+
+## Question 12
+> Use this data to create a plot of that state’s first digit distribution by precinct. Use the number of votes cast for Joseph Biden in each precinct.
+
+```{r}
+c1 <- california %>%
+  filter(candidate == "Joe Biden", votes != 0, votes != "NA") %>%
+  mutate(first_digit = get_first(votes)) %>%
+  group_by(first_digit) %>%
+  summarize(n = n()) %>%
+  ggplot(aes(x = factor(first_digit), y = n)) +
+  geom_col()
+
+c1
+```
+
+## Question 13
+> Does the election you chose appear to fit Benford’s distribution better or worse than the Iran election?
+
+The election I chose appears to fit Benford's distribution worse than the Iran election, i.e. the distribution of first digits of votes for Joe Biden in California fits the least with Benford's distribution compared to any of the four candidates for the Iran election because there is a large bulge around the 6th digit which is not seen in the samplings of Benford's distribution or any of the Iran candidates as prominently. Other than that, it looks like it fits well with the large amount of precincts reporting a first digit of 1 and then dropping off sharply. 

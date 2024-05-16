@@ -1,0 +1,88 @@
+---
+title: "Problem Set 13"
+format: html
+---
+
+```{r}
+set.seed(2032030)
+library(devtools)
+library(tidyverse)
+library(infer)
+install_github("stat20/stat20data")
+library(stat20data)
+data(promote)
+data(curry)
+```
+
+## Question 1
+
+```{r}
+
+```
+
+Null: the proportion of female named candidates promoted and male named candidates promoted are the same
+
+Alt: the proportion of female named candidates promoted and male named candidates promoted are different
+
+```{r}
+promote %>%
+  sepcify(response = decision,
+          explanatory = gender,
+          success = "ppromote") %>%
+calculate(stat = "diff in props", 
+          order = c("female", "male"))
+```
+
+part c
+
+```{r}
+promote %>%
+  ggplot(mapping = aes(x = decision, fill = gender)) +
+  geom_bar(position = "fill")
+```
+
+part d
+
+```{r}
+promote %>%
+  specify(response = decision,
+          explanatory = gender,
+          success = "promote") %>%
+  hypothesize(null = "independence") %>%
+  generate(reps = 9,
+           type = "permute") %>%
+  ggplot(mapping = aes(x = decision, fill = gender)) +
+  geom_bar(position = "fill") +
+  facet_wrap(facets = vars(replicate))
+```
+
+written answer 
+
+part e
+
+```{r}
+promote %>%
+  specify(response = decision,
+          explanatory = gender,
+          success = "promote") %>%
+  hypothesize(null = "independence") %>%
+  generate(reps = 500,
+           type = "permute") %>%
+  calculate(stat = "diff in props")
+```
+
+part f
+
+```{r}
+null %>% 
+  visualize()
+```
+
+```{r}
+null %>%
+  get_p_value(obs_stat = test_stat, direction = "both")
+```
+
+part h
+
+written answer here write something write something write something write something write something write something write something write something write something write something write something write something write something write something

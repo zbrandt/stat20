@@ -1,0 +1,234 @@
+---
+title: "Lab 8: Diagnosing Cancer"
+format: html
+---
+
+```{r}
+# load data and set "B" (benign) as the reference level
+library(tidyverse)
+library(dplyr)
+cells <- read_csv("https://www.dropbox.com/s/0rbzonyrzramdgl/cells.csv?dl=1") %>%
+  mutate(diagnosis = factor(diagnosis, levels = c("B", "M")))
+
+```
+
+## Question 1
+> What is the unit of observation in this data frame?
+
+The unit of observation is a single needle biopsy. 
+
+## Question 2
+> Use a box plot to compare the `radius_mean` for benign vs. malignant biopsies. What is the takeaway from this plot?
+
+```{r}
+ggplot(cells, aes(x = diagnosis, y = radius_mean)) + 
+  geom_boxplot()
+```
+
+Malignant biopsies tend to have learner radii than benign ones. 
+
+## Question 3
+> Select another variable that you suspect might be a good predictor of the diagnosis. Build a plot to illustrate their association and provide an interpretation of what the plot shows.
+
+```{r}
+cells %>%
+  ggplot(aes(x = diagnosis, y = area_mean)) +
+  geom_violin()
+```
+If malignant biopsies tend to have larger radii than benign ones, it is probably likely that malignant biopsies tend to have greater areas too, which is seen in the above plot. 
+
+## Question 4
+> Make a plot that examines the association between two predictors, `radius_mean` and `area_mean`, and calculate the pearson correlation coefficient between these them. How would you describe the strength and shape of their association? What might cause this shape?
+
+```{r}
+cells %>%
+  ggplot(aes(x = radius_mean, y = area_mean)) +
+  geom_point()
+
+cells %>%
+  summarize(r = cor(radius_mean, area_mean))
+```
+
+The strength of the association is very strong, with a correlation coefficient value of ~0.99. The shape of the association appears to be slightly polynomial, which makes sense considering that the observations are potentially roughly circular. 
+
+## Question 5
+> Make a single plot that examines the association between `radius_mean` and `radius_sd` separately for each diagnosis (hint: `aes()` should have three arguments). Calculate the correlation between these two variables for each diagnosis.  
+
+
+```{r}
+cells %>%
+  ggplot(aes(x = radius_mean, y = radius_sd, color = diagnosis)) +
+  geom_point()
+
+cells %>%
+  filter(diagnosis == "M") %>%
+  summarize(r = cor(radius_mean, radius_sd))
+
+cells %>%
+  filter(diagnosis == "B") %>%
+  summarize(r = cor(radius_mean, radius_sd))
+
+```
+
+> Give an interpretation of these results. In particular comment on:  
+
+> * Is the relationship between `radius_mean` and `radius_sd` different for benign biopsies vs. malignant biopsies?
+
+The relationship is different. For benign biopsies, differences in the `radius_mean` tend not to lead to changes in the variability of the radius. For malignant biopsies, increases in the `radius_mean` lead to greater values of `radius_sd`. 
+
+> * If so, can you give an explanation for this difference?
+
+Cells in malignant biopsies tend to have more irregular shapes, which explains the greater variability. 
+
+## Question 6
+> Split the full cells data set into a roughly 80-20 train-test set split. How many observations do you have in each?
+
+
+```{r}
+set.seed(1)
+
+set_type <- sample(x = c('train', 'test'), 
+                   size = 569, 
+                   replace = TRUE, 
+                   prob = c(0.8, 0.2))
+
+cells <- cells %>% 
+    mutate(set_type = set_type)
+
+cells_train <- cells %>%
+  filter(set_type == 'train')
+cells_train
+
+cells_test <- cells %>%
+  filter(set_type == 'test')
+cells_test
+```
+There are 459 observations of training data and 110 observations of testing data. 
+
+## Question 7
+> Using the training data, fit a simple logistic regression model that predicts the diagnosis using the mean of the texture index using a threshold of .5. What would your model predict for a biopsy with a mean texture of 15? What probability does it assign to that outcome?
+
+```{r}
+slrm <- glm(diagnosis ~ texture_mean, data = cells_train, family = "binomial")
+
+test <- data.frame(texture_mean = c(15))
+predict(slrm, test, type = "response")
+```
+
+7. threshold of point 5, something you deal with once the predictive output sare there , no need to code anything, handle the threshold later
+
+## Question 8
+> Calculate the misclassification rate first on the training data and then on the testing data. Is there any evidence that this model is overfitting? How can you tell one way or the other?
+
+```{r}
+p_hat_train <- predict(slrm, cells_train, type = "response")
+p_hat_test <- predict(slrm, cells_test, type = "response")
+
+cells_train %>%
+  select(diagnosis) %>%
+  mutate(p_hat = p_hat_train,
+         y_hat = ifelse(p_hat > 0.5, "M", "B")) %>%
+#         FP = diagnosis == "M" & y_hat == "B",
+#         FN = diagnosis == "B" & y_hat == "M")
+  summarize(msiclas = mean(diagnosis != y_hat))
+
+cells_test %>%
+  select(diagnosis) %>%
+  mutate(p_hat = p_hat_test,
+         y_hat = ifelse(p_hat > 0.5, "M", "B")) %>%
+  summarize(msiclas = mean(diagnosis != y_hat))
+```
+The misclassification rate for the training and testing data is pretty similar so there does not seem to be much evidence for overfitting. Also, running different seeds proudces results where the testing misclassification rate is lower than the training, so there appears to be some variation. If the misclassification rate for the testing data was far higher we might suspect that the model was overfitting to the training data. 
+
+## Question 9
+> Build a more complex model to predict the diagnosis using five predictors of your choosing, then calculate the testing and training misclassification rate. Is there evidence that your model is overfitting? How can you tell one way or the other?
+
+```{r}
+clrm <- glm(diagnosis ~ radius_mean + radius_sd + area_mean + area_sd + texture_mean, data = cells_train, family = "binomial")
+
+p_hat_train <- predict(clrm, cells_train, type = "response")
+p_hat_test <- predict(clrm, cells_test, type = "response")
+
+cells_train %>%
+  select(diagnosis) %>%
+  mutate(p_hat = p_hat_train,
+         y_hat = ifelse(p_hat > 0.5, "M", "B")) %>%
+  summarize(msiclas = mean(diagnosis != y_hat))
+
+cells_test %>%
+  select(diagnosis) %>%
+  mutate(p_hat = p_hat_test,
+         y_hat = ifelse(p_hat > 0.5, "M", "B")) %>%
+  summarize(msiclas = mean(diagnosis != y_hat))
+```
+
+Here the misclassification rates have a slightly greater difference, with the misclassification rate for the testing data being larger, but they are still pretty similar so I would not say this model is overfitting to the training data to a great extent. Also, running the training and testing with mutliple seeds produces results with greater and smaller variance, even in some cases with the testing misclassification rate being lower than the training, so I would say the effect of overfitting is not pronounced. 
+
+## Question 10
+> If you were to deploy your method in a clinical setting to help diagnose cancer, which type of classification error would be worse and why?
+
+I believe classifying a malignant tumor as benign (i.e a false negative, type II error) would be the greater error because then breast cancer would develop unimpeded before discovery and might progress to the point where treatments become more costly and uncertain.
+
+## Question 11
+> Calculate the total number of false negatives in the test data set when using your simple model with only one variable.
+
+```{r}
+p_hat_test <- predict(slrm, cells_test, type = "response")
+
+cells_test %>%
+  select(diagnosis) %>%
+  mutate(p_hat = p_hat_test,
+         y_hat = ifelse(p_hat > 0.5, "M", "B"),
+         FP = diagnosis == "B" & y_hat == "M",
+         FN = diagnosis == "M" & y_hat == "B") %>%
+  group_by(FN) %>%
+  summarize(count = n())
+```
+From the current seed there were 28 false negatives.
+
+## Question 12
+> What can you change about your classification rule to lower the number of false negatives? Make this change and calculate the new number of false negatives.
+
+I could decrease the threshold for classifying biopsies as malignant.
+
+```{r}
+p_hat_test <- predict(slrm, cells_test, type = "response")
+
+cells_test %>%
+  select(diagnosis) %>%
+  mutate(p_hat = p_hat_test,
+         y_hat = ifelse(p_hat > 0.25, "M", "B"),
+         FP = diagnosis == "B" & y_hat == "M",
+         FN = diagnosis == "M" & y_hat == "B") %>%
+  group_by(FN) %>%
+  summarize(n = n())
+```
+In this seed I now have 9 false negatives after decreasing the threshold to 0.25. 
+
+## Question 13
+> Calculate the testing misclassification rate using your new classification rule. Did it go up or down? Why?
+
+```{r}
+
+p_hat_train <- predict(slrm, cells_train, type = "response")
+p_hat_test <- predict(slrm, cells_test, type = "response")
+
+cells_train %>%
+  select(diagnosis) %>%
+  mutate(p_hat = p_hat_train,
+         y_hat = ifelse(p_hat > 0.25, "M", "B")) %>%
+  summarize(msiclas = mean(diagnosis != y_hat))
+
+cells_test %>%
+  select(diagnosis) %>%
+  mutate(p_hat = p_hat_test,
+         y_hat = ifelse(p_hat > 0.25, "M", "B")) %>%
+  summarize(msiclas = mean(diagnosis != y_hat))
+```
+
+The misclassification rate increased slightly with the threshold change, probably because we are now biasing our results towards false positives more than we should. However with some seeds I noticed a decrease in the misclassification rate, so there is some random variability to it all which suggests that the effect is not super pronounced. 
+
+## Question 14
+> In many realms of medicine, classification algorithms can be more accurate than the most well-trained medical doctors. What is gained and what is lost by shifting to algorithmic diagnoses? Although a book could be written about this topic, please answer in one paragraph.
+
+More resources are gained from using classification algorithms because you don't have to employ as many doctors if the algorithms are definitively better than the doctors. The doctors might also be enabled to do more productive things now that the algorithms can handle the classification task. However, you might lose a "human touch" factor when it comes to using algorithms that might be able to see things differently. 
